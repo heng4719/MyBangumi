@@ -1,7 +1,7 @@
 const axios = require('axios');
 var convert = require('xml-js');
 
-//更新资源
+//自动更新资源并发送提醒
 function updateBangumi(connection){
     return new Promise(function(resove, reject){
         let subscribes = []
@@ -104,9 +104,6 @@ function updateBangumi(connection){
                                         hasUpdate: false
                                     })  
                                 }
-                                // new Promise(function(resove1, reject1){
-                                    
-                                // })
                                 let users = new Set();
                                 newList.forEach((item, index) => {
                                     msg += "-------------------\n"
@@ -149,7 +146,7 @@ function updateBangumi(connection){
     })
 }
 
-/*查询订阅更新情况
+/*查询该用户订阅番剧的最新情况
 【订阅小助手】最新番剧资源
 ------------------------------
 番剧名称:古见同学有交流障碍症[19]
@@ -160,15 +157,22 @@ function updateBangumi(connection){
 function getUpdateInfo(connection, qq){
     return new Promise(function(resoveOK, reject){    
         let results = []    
-        new Promise(function(resove, reject){        
+        new Promise(function(resove, reject){
             connection.query(`SELECT * from user where qq = ${qq}`, function (error, user, fields) {
                 if (error) throw error;
                 user = user[0]
                 // console.log("user ", user)
                 // console.log("subscribes ", user.subscribes)
+                //subscribes长这样 |1||3| 先根据||分割字符串，得到 ['|1', '3|']，然后去除 | 字符，转为数字
+                let subscribesArr = String(user.subscribes).split("||").map(function(item){
+                    return item.replace("|", "")
+                }).map(function(item){
+                    return parseInt(item)
+                })
+                console.log("Arr: ", subscribesArr)
                 //先查出来该用户订阅了哪些番剧
-                let queryBangumiSql = `SELECT * from bangumi where id in (${user.subscribes})`
-                // console.log("queryBangumiSql ", queryBangumiSql)        
+                let queryBangumiSql = `SELECT * from bangumi where id in (${subscribesArr})`
+                console.log("queryBangumiSql ", queryBangumiSql)        
                 connection.query(queryBangumiSql, function (error, bangumis, fields) {
                     if (error) throw error;
                     // console.log("bangumis ", bangumis)
@@ -205,37 +209,38 @@ function getUpdateInfo(connection, qq){
     })
 }
 
-/*
-【订阅小助手】有新的番剧更新
-------------------------------
-番剧名称:古见同学有交流障碍症[19]
-下载地址:https://mikanani.me/Download/20220519/20e2db4e41a3a4c5f110428a8c06cfd433d676f9.torrent
-@张大力@XXX
-------------------------------
-*/
-function noticeAll(list, connection, bot){
-    console.log("list", list)
-    let noticeArry = new Map()
-    list.forEach(item => {
-        
-    });
-    //查询所有用户，并匹配其本次是否有需要通知更新的番剧
-    connection.query('SELECT * from user', function (error, results, fields) {
-        if (error) throw error;
-        console.log("results ", )
-        results.forEach(user => {
-            let subscribeList = user.notice.split(',')            
-            list.forEach(item => {
-                if(subscribeList.indexOf(item.bangumiId) > 0){
-                    noticeArry.push({
-                        qq: user.qq,
-                        bangumiId:bangumiId
-                    })
-                }
+function querySubscribeList(connection, qq){
+    return new Promise(function(resoveOK, reject){
+        new Promise(function(resove, reject){        
+            connection.query(`SELECT * from user where qq = ${qq}`, function (error, user, fields) {
+                if (error) throw error;
+                user = user[0]
+                //subscribes长这样 |1||3| 先根据||分割字符串，得到 ['|1', '3|']，然后去除 | 字符，转为数字
+                let subscribesArr = String(user.subscribes).split("||").map(function(item){
+                    return item.replace("|", "")
+                }).map(function(item){
+                    return parseInt(item)
+                })
+                console.log("Arr: ", subscribesArr)
+                //先查出来该用户订阅了哪些番剧
+                let queryBangumiSql = `SELECT title from bangumi where id in (${subscribesArr})`    
+                connection.query(queryBangumiSql, function (error, bangumis, fields) {
+                    if (error) throw error;
+                    console.log("bangumis: ", bangumis)
+                    resove(bangumis)
+                });
             });
-        });
-      });
+        }).then(function(results) {
+            let msg = "【订阅小助手】当前订阅番剧：\n"
+            results.forEach((item, index) => {
+                msg += `${index+1}. ${String(item.title).split(",")[0]}\n`
+                // msg += index + item.title + "\n"
+            });
+            resoveOK(msg)
+        })
+    })
+
 }
 
 
-module.exports = {updateBangumi, getUpdateInfo}
+module.exports = {updateBangumi, getUpdateInfo, querySubscribeList}
