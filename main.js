@@ -71,12 +71,17 @@ bot.onMessage(async message => {
   //-----------------番剧订阅 End--------------
   //------------------------------------------
 
+
   if(msg.includes('LDS') || msg.includes('lds')){        
-    // reply('LDS功能正在绝赞开发中');
+    reply('LDS功能正在绝赞开发中');
   }
+
+
   if(msg.includes('setu')){        
     reply('别急，你先别急');
   }
+
+
   // 直接回复
   // if (msg.includes('收到了吗'))
   //   reply('收到了收到了'); // 或者: bot.reply('收到了收到了', message)
