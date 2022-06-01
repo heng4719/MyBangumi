@@ -78,17 +78,17 @@ bot.onMessage(async message => {
     reply('别急，你先别急');
   }
   // 直接回复
-  if (msg.includes('收到了吗'))
-    reply('收到了收到了'); // 或者: bot.reply('收到了收到了', message)
-  // 引用回复
-  else if (msg.includes('引用我'))
-    quoteReply([At(sender.id), Plain('好的')]); // 或者: bot.quoteReply(messageChain, message)
-  // 撤回消息
-  else if (msg.includes('撤回'))
-    bot.recall(message);
-  // 发送图片，参数接受图片路径或 Buffer
-  else if (msg.includes('来张图'))
-    bot.sendImageMessage("./image.jpg", message);
+  // if (msg.includes('收到了吗'))
+  //   reply('收到了收到了'); // 或者: bot.reply('收到了收到了', message)
+  // // 引用回复
+  // else if (msg.includes('引用我'))
+  //   quoteReply([At(sender.id), Plain('好的')]); // 或者: bot.quoteReply(messageChain, message)
+  // // 撤回消息
+  // else if (msg.includes('撤回'))
+  //   bot.recall(message);
+  // // 发送图片，参数接受图片路径或 Buffer
+  // else if (msg.includes('来张图'))
+  //   bot.sendImageMessage("./image.jpg", message);
 });
 
 /* 开始监听消息(*)
