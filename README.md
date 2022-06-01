@@ -61,11 +61,8 @@ adapterSettings:
 3. 如果底部控制台里面出现如下字样即表示启动成功，接下来可以欣赏我的代码并进行开发工作了。
 ```
 接口服务已启动 port: 3000
-js/httpServer.js:20
 Authed with session key undefined
-main.js:129
 Verified with session key undefined
-main.js:135
 There are 4 friends in bot
 ```
 
