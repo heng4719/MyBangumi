@@ -68,3 +68,10 @@ Verified with session key undefined
 main.js:135
 There are 4 friends in bot
 ```
+
+### 3.4 数据库配置
+1. 忘了说了，为了做订阅功能的时候加了个MySQL数据库，你要是用不到就把第十一行的
+```
+var con = InitDataBase(); 这个代码给注释掉就可以了
+```
+2. 如果你也要用数据库，数据库初始化sql我放在/mirai/sql_bak里面了，你可以拿去在数据库里面跑一下。
