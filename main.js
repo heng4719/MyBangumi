@@ -61,8 +61,8 @@ bot.onMessage(async message => {
           let interval = setInterval( function(){ 
             
             console.log("setInterval")
-            // bot.sendGroupMessage("Hello", sender.group.id)
-            bangumi.updateBangumi(con).then(function(res){
+            //  bangumi.updateBangumi
+            bangumi.autoUpdate(con).then(function(res){
               if(res.hasUpdate){
                 let actions = [
                   Plain(res.msg)
@@ -73,10 +73,6 @@ bot.onMessage(async message => {
                 console.log("发生更新，进行通知 actions", actions)
                 console.log("发生更新，进行通知 sender.group.id", sender.group.id)
                 bot.sendGroupMessage("Hello", sender.group.id)
-                // bot.sendGroupMessage([Plain("123"), Plain("234")], sender.group.id)
-                // bot.quoteReply(actions, message).then(res => {
-                //   console.log("res1 ", res)
-                // });
                 bot.sendGroupMessage(actions, sender.group.id).then(res => {
                   console.log("res2 ", res)
                 })

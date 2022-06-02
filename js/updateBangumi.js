@@ -1,6 +1,160 @@
 const axios = require('axios');
 var convert = require('xml-js');
-const url = require('url')
+const url = require('url');
+const { resolve } = require('path');
+
+function autoUpdate(connection){
+    return new Promise( (resolve, reject) => {
+        let subscribes = []
+        //查询该用户订阅的所有番剧
+        new Promise((r, j) => {
+            connection.query('SELECT * from bangumi', function (error, results, fields) {
+              if (error) {
+                  j("ERR 1")
+                  throw error;
+              }
+              results.forEach(item => {
+                let title = item.title.split(',')
+                subscribes.push({
+                    id: item.id,
+                    title: title,
+                    lastIndex: item.last_index,
+                    source:[]
+                })
+              });
+              r(subscribes)
+            })
+        }).then(subscribes => {
+            return new Promise((r,j)=>{
+                axios.get('https://mikanani.me/RSS/MyBangumi?token=g7fiCQpq5lEeUkZ3gSn27LgehEcZ3larcTuNwFb5LUw%3d')
+                .then(res => {
+                    var result = convert.xml2json(res.data, {compact: true, spaces: 4});
+                    let rss = JSON.parse(result)
+                    let bangumi = rss.rss.channel.item;        
+                    //填充订阅资源列表
+                    subscribes.forEach((sub, index) => {
+                        //可能存在多个名称，所以每个名称都匹配一遍
+                        sub.title.forEach(name => {
+                            bangumi.forEach(anim => {
+                                if(anim.guid._text.lastIndexOf(name) >= 0){
+                                    //查询出这是第几集
+                                    let episodeIndex = String(anim.guid._text).search(/\[[0-9][0-9]\]/) == -1 ? //[05]
+                                            (String(anim.guid._text).search(/\【[0-9][0-9]\】/) == -1 ? //【05】
+                                                (String(anim.guid._text).search(/\s[0-9][0-9]\s/) == -1 ? //  05  
+                                                -1:String(anim.guid._text).search(/\s[0-9][0-9]\s/))
+                                            :String(anim.guid._text).search(/\【[0-9][0-9]\】/) )
+                                        :String(anim.guid._text).search(/\[[0-9][0-9]\]/)
+                                    if(episodeIndex != -1){
+                                        let episode = parseInt(anim.guid._text.slice(episodeIndex+1, episodeIndex+3))
+                                        subscribes[index].source.push({
+                                            bangumiId: sub.id,
+                                            title: anim.guid._text,
+                                            episode: episode,
+                                            link: anim.link._text,
+                                            torrent: anim.enclosure._attributes.url
+                                        })
+                                        
+                                    }
+                                }
+                            });
+                        })
+                    })            
+                    //按集数倒序排列
+                    subscribes.forEach(sub => {
+                        sub.source.sort(function(a, b) {
+                            return b.episode - a.episode
+                        })
+                    });
+                    r(subscribes);
+                })
+            }).then(subscribes => {
+                return new Promise((r,j)=>{
+                    //更新番剧资源
+                    let newList = []
+                    console.log("subscribes: ", subscribes)
+                    subscribes.forEach((sub, index) => {
+                        console.log("out loop ", index)
+                        let LastIndex = subscribes[index].lastIndex
+                        sub.source.forEach((item, index2) => {
+                            //判断该资源是否已被收录
+                            let sql = `SELECT id from resources where link = '${item.link}'`
+                            connection.query(sql, function (error, results, fields) {
+                              if (error) throw error;
+                              if(results.length == 0){
+                                //说明该资源为新增，需要插入数据库
+                                let sql = "insert into resources values(?,?,?,?,?,?)";
+                                let params=[null,sub.id, item.title, item.episode, item.link, item.torrent];
+                                connection.query(sql,params,(err,result)=>{
+                                    if (err) {
+                                        console.error("新增失败" + err.message);
+                                    }
+                                    console.log("新增成功", item.title);
+                                });
+                            
+                                //判断是否为新的一集，并更新番剧列表
+                                if(item.episode > LastIndex){
+                                    //记录哪些番剧这次发生了更新
+                                    newList.push(item)
+                                    console.log("发现了更新资源", item.title)
+                                    LastIndex = item.episode
+                                    let sql = `UPDATE bangumi SET last_index = ? WHERE id = ?`;
+                                    let data = [item.episode, sub.id];
+                                    connection.query(sql, data, (error, results, fields) => {
+                                        if (error){
+                                            console.error(error.message);
+                                            j();
+                                        }
+                                    });
+                                }
+                                console.log(index , subscribes.length - 1, index2, sub.source.length -1)
+                                if((index == subscribes.length - 1) && (index2 == sub.source.length -1)){
+                                    console.log("newList ", newList)
+                                    let msg = "【订阅小助手】有番剧更新啦\n"
+                                    if(newList.length == 0){
+                                        r({
+                                            msg: msg,
+                                            hasUpdate: false
+                                        })  
+                                    }
+                                    let users = new Set();
+                                    newList.forEach((item, index) => {
+                                        msg += "-------------------\n"
+                                        msg += "番剧名称: " + item.title + "\n"
+                                        msg += "种子地址: " + item.torrent + "\n"
+                                    
+                                        //查出有哪些用户订阅了该番剧 
+                                        let sql = `select qq from user where subscribes like '%|${item.bangumiId}|%'`                              
+                                        connection.query(sql, data, (error, results, fields) => {
+                                            if (error){
+                                                j(); console.error(error.message);
+                                            }
+                                            results.forEach(user => {
+                                                users.add(parseInt(user.qq))
+                                            });
+                                        
+                                            if(index == newList.length-1){
+                                                msg += "-------------------\n"
+                                                r({
+                                                    msg: msg,
+                                                    users: Array.from(users),
+                                                    hasUpdate: true
+                                                })  
+                                            }
+                                        });
+                                    });             
+                                }
+                              }
+                            });  
+                        });              
+                    }); 
+                    console.log("跑完了")
+                }).then(res => {
+                    resolve(res)
+                })
+            })
+        })
+    })
+}
 
 //自动更新资源并发送提醒
 function updateBangumi(connection){
@@ -61,7 +215,8 @@ function updateBangumi(connection){
                     return b.episode - a.episode
                 })
             });
-    
+
+
             //更新番剧资源
             let newList = []
             console.log("subscribes: ", subscribes)
@@ -150,7 +305,7 @@ function updateBangumi(connection){
         })
         .catch(err => {
             console.log('Error: ', err.message);
-        });    
+        });
     })
 }
 
@@ -364,4 +519,4 @@ function DealSubscribe(msg, sender, connection){
 }
 
 
-module.exports = {updateBangumi, getUpdateInfo, querySubscribeList, bungumiManage, DealSubscribe}
+module.exports = {updateBangumi, getUpdateInfo, querySubscribeList, bungumiManage, DealSubscribe, autoUpdate}
