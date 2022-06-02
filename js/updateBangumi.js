@@ -1,9 +1,11 @@
 const axios = require('axios');
 var convert = require('xml-js');
+const url = require('url')
 
 //自动更新资源并发送提醒
 function updateBangumi(connection){
     return new Promise(function(resove, reject){
+        console.log("updateBangumi 1")
         let subscribes = []
         //查询该用户订阅的所有番剧
         connection.query('SELECT * from bangumi', function (error, results, fields) {
@@ -64,8 +66,10 @@ function updateBangumi(connection){
             let newList = []
             console.log("subscribes: ", subscribes)
             subscribes.forEach((sub, index) => {
+                console.log("out loop ", index)
                 let LastIndex = subscribes[index].lastIndex
                 sub.source.forEach((item, index2) => {
+                    console.log("inner loop ", index)
                     //判断该资源是否已被收录
                     let sql = `SELECT id from resources where link = '${item.link}'`
                     connection.query(sql, function (error, results, fields) {
@@ -77,68 +81,72 @@ function updateBangumi(connection){
                         connection.query(sql,params,(err,result)=>{
                             if (err) {
                                 console.error("新增失败" + err.message);
-                                return;
+                                resove();
                             }
                             // console.log("新增成功", item.title);
                         });
     
                         //判断是否为新的一集，并更新番剧列表
                         if(item.episode > LastIndex){
+                            //记录哪些番剧这次发生了更新
+                            newList.push(item)
+                            console.log("发现了更新资源", item)
                             LastIndex = item.episode
                             let sql = `UPDATE bangumi SET last_index = ? WHERE id = ?`;
                             let data = [item.episode, sub.id];
                             connection.query(sql, data, (error, results, fields) => {
                                 if (error){
-                                    return console.error(error.message);
+                                    console.error(error.message);
+                                    resove();
                                 }
                             });
-                            //记录哪些番剧这次发生了更新
-                            newList.push(item)
-                            if(index == subscribes.length - 1){
-                                console.log("newList ", newList)           
-                                //     //组织文本
-                                let msg = "【订阅小助手】有番剧更新啦\n"
-                                if(newList.length == 0){
-                                    resove({
-                                        msg: msg,
-                                        hasUpdate: false
-                                    })  
-                                }
-                                let users = new Set();
-                                newList.forEach((item, index) => {
-                                    msg += "-------------------\n"
-                                    msg += "番剧名称: " + item.title + "\n"
-                                    msg += "种子地址: " + item.torrent + "\n"
-
-                                    //查出有哪些用户订阅了该番剧 
-                                    let sql = `select qq from user where subscribes like '%|${item.bangumiId}|%'`                              
-                                    connection.query(sql, data, (error, results, fields) => {
-                                        if (error){
-                                            return console.error(error.message);
-                                        }
-                                        console.log("这些用户 ", results, "订阅了", item.title)
-                                        results.forEach(user => {
-                                            users.add(parseInt(user.qq))
-                                        });
-
-                                        if(index == newList.length-1){
-                                            msg += "-------------------\n"
-                                            resove({
-                                                msg: msg,
-                                                users: Array.from(users),
-                                                hasUpdate: true
-                                            })  
-                                        }
-                                    });
-                                });             
+                        }
+                        
+                        console.log("inner loop2 ", index)
+                        console.log(index , subscribes.length - 1, index2, sub.source.length -1)
+                        if((index == subscribes.length - 1) && (index2 == sub.source.length -1)){
+                            console.log("newList ", newList)           
+                            //     //组织文本
+                            let msg = "【订阅小助手】有番剧更新啦\n"
+                            if(newList.length == 0){
+                                resove({
+                                    msg: msg,
+                                    hasUpdate: false
+                                })  
                             }
+                            let users = new Set();
+                            newList.forEach((item, index) => {
+                                msg += "-------------------\n"
+                                msg += "番剧名称: " + item.title + "\n"
+                                msg += "种子地址: " + item.torrent + "\n"
+
+                                //查出有哪些用户订阅了该番剧 
+                                let sql = `select qq from user where subscribes like '%|${item.bangumiId}|%'`                              
+                                connection.query(sql, data, (error, results, fields) => {
+                                    if (error){
+                                        return console.error(error.message);
+                                    }
+                                    results.forEach(user => {
+                                        users.add(parseInt(user.qq))
+                                    });
+
+                                    if(index == newList.length-1){
+                                        msg += "-------------------\n"
+                                        resove({
+                                            msg: msg,
+                                            users: Array.from(users),
+                                            hasUpdate: true
+                                        })  
+                                    }
+                                });
+                            });             
                         }
                       }
                     });  
-
-                });  
+                });              
+            }); 
             
-            });  
+            
         })
         .catch(err => {
             console.log('Error: ', err.message);
@@ -181,10 +189,12 @@ function getUpdateInfo(connection, qq){
                         // console.log("queryResourceSql ", queryResourceSql)        
                         connection.query(queryResourceSql, function (error, resource, fields) {
                             if (error) throw error;
-                            results.push({
-                                title: resource[0].title,
-                                torrent: resource[0].torrent
-                            })
+                            if(resource.length > 0){
+                                results.push({
+                                    title: resource[0].title,
+                                    torrent: resource[0].torrent
+                                })
+                            }
                             if(index == bangumis.length - 1){
                                 resove(results)
                             }
@@ -223,7 +233,7 @@ function querySubscribeList(connection, qq){
                 })
                 console.log("Arr: ", subscribesArr)
                 //先查出来该用户订阅了哪些番剧
-                let queryBangumiSql = `SELECT title from bangumi where id in (${subscribesArr})`    
+                let queryBangumiSql = `SELECT id, title from bangumi where id in (${subscribesArr})`    
                 connection.query(queryBangumiSql, function (error, bangumis, fields) {
                     if (error) throw error;
                     console.log("bangumis: ", bangumis)
@@ -233,14 +243,125 @@ function querySubscribeList(connection, qq){
         }).then(function(results) {
             let msg = "【订阅小助手】当前订阅番剧：\n"
             results.forEach((item, index) => {
-                msg += `${index+1}. ${String(item.title).split(",")[0]}\n`
-                // msg += index + item.title + "\n"
+                msg += `${item.id}. ${String(item.title).split(",")[0]}\n`
             });
             resoveOK(msg)
         })
     })
+}
+//bgm manage <method> [params]
+//bgm manage add 番剧1,1别名|番剧2|番剧三
+//bgm manage del 1|2|3
+//bgm manage queryAll
+function bungumiManage(msg, sender, connection){
+    return new Promise((resove, reject) => {
+        let req = String(msg).split(' ')
+        let method = req[2]
+        switch(method){
+            case "queryAll":{
+                //返回所有番剧
+                connection.query(`SELECT * from bangumi`, function (error, results, fields) {
+                    if (error) throw error;                
+                    let msg = "【订阅小助手】番剧列表：\n"
+                    results.forEach((item) => {
+                        msg += `${item.id}. ${item.title}\n`
+                    });
+                    resove(msg)
+                });            
+                break;
+            }
+            case "add":{
+                if(sender.id != '986472954') return "只有管理员才可以操作番剧，注意你的身份！"
+                if(req.length < 4) resove("缺少参数")
+                let nameArr = String(req[3]).split("|")
+                nameArr.forEach((name, index) => {                    
+                    let sql = "insert into bangumi(title, last_index) values(?,0)";
+                    let params=[name];
+                    connection.query(sql,params,(err,result)=>{
+                        if (err) {
+                            console.error("新增失败" + err.message);
+                        }
+                    });
+                    if(index == nameArr.length - 1){
+                        resove("操作完成")
+                    }
+                });
+                break;
+            }
+            case "del":{
+                if(sender.id != '986472954') return "只有管理员才可以操作番剧，注意你的身份！"
+                if(req.length < 4) resove("缺少参数")
+                let ids = String(req[3]).split("|")
+                let sql = `delete from bangumi where id in (${ids.toString()})`;
+                connection.query(sql,null,(err,result)=>{
+                    if (err) {
+                        console.error("新增失败" + err.message);
+                    }
+                    resove("操作完成")
+                });
+                break
+            }
+        }
 
+    })
+}
+
+//bgm add|del 1,2,4
+function DealSubscribe(msg, sender, connection){
+    return new Promise( (resove, reject) => {
+        let msgArr = msg.split(" ")
+        //判断该用户是否存在于user
+        new Promise((r,j) => {
+            let sql = `select * from user where qq = ${sender.id}`;
+            connection.query(sql,null,(err,users)=>{
+                if (err) {
+                    console.error("新增失败" + err.message);
+                }
+                if(users.length == 0){
+                    //说明此前没有该用户，需要新增一下用户，如果碰巧也是add指令，就一起做了，del指令就忽略不管
+                    let subs = ""
+                    if(msgArr[1] == "add"){
+                        subs = msgArr[2].split(",").map(item => `|${item}|`).join("")
+                    }else{
+                        r("并没有可供删除的订阅")
+                    }
+                    let sql = `insert into user(qq, subscribes) values(?,?)`;
+                    let params = [sender.id, subs]
+                    connection.query(sql,params,(err,user)=>{
+                        if (err) {
+                            console.error("新增失败" + err.message);
+                        }else{
+                            r("添加完成");
+                        }
+                    });
+                }else{
+                    //查询到了该用户
+                    let user = users[0]
+                    let hasSet = new Set(String(user.subscribes).split("||").map(item => item.replace("|", "")))
+                    // let hasSet = String(user.subscribes).split("||").map(item => item.replace("|", ""))
+                    let reqArr = String(msgArr[2]).split(",")
+                    reqArr.forEach(id => {
+                        msgArr[1] == "add" ? hasSet.add(id): hasSet.delete(id)
+                    });
+                    hasSet = [...hasSet]
+                    let subscribes = hasSet.map(id => `|${id}|`).join("")
+                    console.log("subscribes", subscribes)                    
+                    let sql = `update user set subscribes = '${subscribes}' where id = ${user.id}`;
+                    console.log("sql", sql)            
+                    connection.query(sql,null,(err,user)=>{
+                        if (err) {
+                            console.error("新增失败" + err.message);
+                        }else{
+                            msgArr[1] == "add" ? r("添加完成"): r("删除完成")
+                        }
+                    });
+                }
+            });
+        }).then(res => {
+            resove(res)
+        })
+    })
 }
 
 
-module.exports = {updateBangumi, getUpdateInfo, querySubscribeList}
+module.exports = {updateBangumi, getUpdateInfo, querySubscribeList, bungumiManage, DealSubscribe}

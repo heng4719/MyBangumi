@@ -25,56 +25,126 @@ bot.onMessage(async message => {
   console.log("msg: ", msg)
   console.log("sender: ", sender)
 
-  //------------------------------------------
-  //-----------------番剧订阅 Start------------
-  //------------------------------------------
-  //主动查询番剧更新情况
-  if (msg.includes('更新资源')){
-    console.log("开始查询番剧更新情况")
-    DealBangumiUpdate(reply, message, true);
-  }
-  //开启订阅通知
-  if (msg.includes('开启订阅通知')){
-    console.log("开启订阅通知")
-    //检查是否已开启
-    if(NoticeGroup.filter(function(item){
-      return item.groupId == sender.group.id
-    }).length == 0) {
-      let interval = setInterval( function(){ DealBangumiUpdate(reply, message, false)}, 1000 * 60 * 5); //每1分钟拉取一次
-      NoticeGroup.push({
-        groupId: sender.group.id,
-        interval: interval
-      })
-      if(interval) reply('订阅通知已开启');
-    }else{
-      reply('本群已开启订阅通知，憋重复发命令');
+  
+    //测试主动群聊
+    if(msg.includes("t1")){
+      console.log("sender.group.id ", sender.group.id)
+      bot.sendGroupMessage("Hello", sender.group.id)
     }
-  }
-  //查询该用户订阅的所有新番的最新一集
-  if(msg.includes('最新一集')){
-    bangumi.getUpdateInfo(con, sender.id).then(function(result){
-      bot.quoteReply([Plain(result)], message);
-    });    
-  }
 
-  if(msg.includes('订阅管理')){
-    let returnMsg = `目前仅提供网页端订阅管理功能，你的管理页面:http://budeliao.top/bangumi/subscribe?qq=${sender.id}`
-    reply(returnMsg);
-  }
+  if(String(msg).split(" ")[0] == "bgm"){
+    //------------------------------------------
+    //-----------------番剧订阅 Start------------
+    // bgm <command> [params]
+    // 主动更新番剧资源： bgm update
+    // 订阅通知开关选项： bgm notice on/off
+    // 查询最新订阅更新： bgm new
+    // 进入订阅管理网页： bgm manageWeb
+    // 查询自己订阅列表： bgm mylist
+    // 进行番剧列表管理： bgm manage <queryAll|add|del> [poarams]
+    // 新增删除订约番剧： bgm add|del 番剧id
+    //------------------------------------------
+    //主动查询番剧更新情况
+    if (msg.includes('bgm update')){    
+      console.log("开始查询番剧更新情况")
+      DealBangumiUpdate(true, sender.group.id, bot);
+    }
 
-  if(msg.includes('订阅列表')){
-    bangumi.querySubscribeList(con, sender.id).then(msg => {
-      quoteReply([Plain(msg)]);
-    })
+
+    //开启订阅通知
+    if (msg.includes('bgm notice')){
+      if(msg.includes('bgm notice on')){
+        //检查是否已开启
+        if(NoticeGroup.filter(function(item){
+          return item.groupId == sender.group.id
+        }).length == 0) {          
+          let interval = setInterval( function(){ 
+            
+            console.log("setInterval")
+            // bot.sendGroupMessage("Hello", sender.group.id)
+            bangumi.updateBangumi(con).then(function(res){
+              if(res.hasUpdate){
+                let actions = [
+                  Plain(res.msg)
+                ]
+                res.users.forEach(qq => {
+                  actions.push(At(qq))
+                });
+                console.log("发生更新，进行通知 actions", actions)
+                console.log("发生更新，进行通知 sender.group.id", sender.group.id)
+                bot.sendGroupMessage("Hello", sender.group.id)
+                // bot.sendGroupMessage([Plain("123"), Plain("234")], sender.group.id)
+                // bot.quoteReply(actions, message).then(res => {
+                //   console.log("res1 ", res)
+                // });
+                bot.sendGroupMessage(actions, sender.group.id).then(res => {
+                  console.log("res2 ", res)
+                })
+              }
+            })
+          
+          }, 1000 * 60 * 1); //每1分钟拉取一次        
+          NoticeGroup.push({
+            groupId: sender.group.id,
+            interval: interval
+          })
+          if(interval) bot.quoteReply([Plain('订阅通知已开启')], message); 
+        }else{
+          bot.quoteReply([Plain('本群已开启订阅通知，憋重复发命令')], message); 
+        }
+      }else if(msg.includes('bgm notice off')){
+        let arr = NoticeGroup.filter(function(item){
+          return item.groupId == sender.group.id
+        })
+        if(arr.length == 0){
+          bot.quoteReply([Plain('本群并未开启订阅通知')], message); 
+        }else{
+          clearInterval(arr[0].interval)
+          bot.quoteReply([Plain('订阅通知已关闭')], message); 
+        }
+      }
+    }
+
+
+    //查询该用户订阅的所有新番的最新一集
+    if(msg.includes('bgm new')){
+      bangumi.getUpdateInfo(con, sender.id).then(function(result){
+        bot.quoteReply([Plain(result)], message);
+      });    
+    }
+
+    if(msg.includes('bgm manageWeb')){
+      let returnMsg = `目前仅提供网页端订阅管理功能，你的管理页面:http://budeliao.top/bangumi/subscribe?qq=${sender.id}`
+      reply(returnMsg);
+    }
+
+    //订阅列表
+    if(msg.includes('bgm mylist')){
+      bangumi.querySubscribeList(con, sender.id).then(msg => {
+        bot.quoteReply([Plain(msg)], message);
+      })
+    }
+
+    if(msg.includes('bgm manage')){
+      bangumi.bungumiManage(msg, sender, con).then( msg => {
+        bot.quoteReply([Plain(msg)], message);
+      })  
+    }
+
+    if(msg.includes('bgm add') || msg.includes('bgm del')){
+      bangumi.DealSubscribe(msg, sender, con).then( msg => {
+        bot.quoteReply([Plain(msg)], message);
+      })
+    }
   }
   //------------------------------------------
   //-----------------番剧订阅 End--------------
   //------------------------------------------
 
 
-  if(msg.includes('LDS') || msg.includes('lds')){        
-    reply('LDS功能正在绝赞开发中');
-  }
+  // if(msg.includes('LDS') || msg.includes('lds')){        
+  //   reply('LDS功能正在绝赞开发中');
+  // }
 
 
   if(msg.includes('setu')){        
@@ -147,7 +217,8 @@ function InitMiraiBot(){
   return bot;
 }
 
-function DealBangumiUpdate(reply, message, isActice){
+function DealBangumiUpdate(isActice, groupId, bot){
+  console.log("DealBangumiUpdate")
   bangumi.updateBangumi(con).then(function(res){
     if(res.hasUpdate){
       let actions = [
@@ -156,9 +227,16 @@ function DealBangumiUpdate(reply, message, isActice){
       res.users.forEach(qq => {
         actions.push(At(qq))
       });
-      reply(actions, message);
+      console.log("发生更新，进行通知 actions", actions)
+      console.log("发生更新，进行通知 groupId", groupId)
+      bot.sendGroupMessage(actions, groupId).then(res => {
+        console.log("res ", res)
+      })
     }else {
-      if(isActice) reply([Plain("很遗憾，并没有番剧更新捏"), At(sender.id)], message);
+      console.log("未发生更新，如果主动则进行通知")
+      if(isActice) 
+        bot.sendGroupMessage("很遗憾，并没有番剧更新捏", groupId);
+      // reply([Plain("很遗憾，并没有番剧更新捏"), At(sender.id)], message);
     }
   })
 }
