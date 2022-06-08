@@ -71,11 +71,12 @@ function autoUpdate(connection){
                 return new Promise((r,j)=>{
                     //更新番剧资源
                     let newList = []
-                    console.log("subscribes: ", subscribes)
+                    // console.log("subscribes: ", subscribes)
                     subscribes.forEach((sub, index) => {
-                        console.log("out loop ", index)
+                        // console.log("out loop ", index)
                         let LastIndex = subscribes[index].lastIndex
                         sub.source.forEach((item, index2) => {
+                            // console.log(index , subscribes.length - 1, index2, sub.source.length -1)
                             //判断该资源是否已被收录
                             let sql = `SELECT id from resources where link = '${item.link}'`
                             connection.query(sql, function (error, results, fields) {
@@ -106,48 +107,50 @@ function autoUpdate(connection){
                                         }
                                     });
                                 }
-                                console.log(index , subscribes.length - 1, index2, sub.source.length -1)
-                                if((index == subscribes.length - 1) && (index2 == sub.source.length -1)){
-                                    console.log("newList ", newList)
-                                    let msg = "【订阅小助手】有番剧更新啦\n"
-                                    if(newList.length == 0){
-                                        r({
-                                            msg: msg,
-                                            hasUpdate: false
-                                        })  
-                                    }
-                                    let users = new Set();
-                                    newList.forEach((item, index) => {
-                                        msg += "-------------------\n"
-                                        msg += "番剧名称: " + item.title + "\n"
-                                        msg += "种子地址: " + item.torrent + "\n"
-                                    
-                                        //查出有哪些用户订阅了该番剧 
-                                        let sql = `select qq from user where subscribes like '%|${item.bangumiId}|%'`                              
-                                        connection.query(sql, data, (error, results, fields) => {
-                                            if (error){
-                                                j(); console.error(error.message);
-                                            }
+                              }
+                              if(index == subscribes.length - 1 && index2 ==  sub.source.length -1){
+                                  let msg = "【订阅小助手】有番剧更新啦\n"
+                                  if(newList.length == 0){
+                                      r({
+                                          msg: msg,
+                                          hasUpdate: false
+                                      })  
+                                  }
+                                  let users = new Set();
+                                  newList.forEach((item, index) => {                                  
+                                      //查出有哪些用户订阅了该番剧 
+                                      let sql = `select qq from user where subscribes like '%|${item.bangumiId}|%'`
+                                      connection.query(sql, null, (error, results, fields) => {
+                                          if (error){
+                                              j(); console.error(error.message);
+                                          }
+                                          if(results.length != 0){
+                                            msg += "-------------------\n"
+                                            msg += "番剧名称: " + item.title + "\n"
+                                            msg += "种子地址: " + item.torrent + "\n"
                                             results.forEach(user => {
                                                 users.add(parseInt(user.qq))
                                             });
-                                        
-                                            if(index == newList.length-1){
+                                          }
+                                          if(index == newList.length-1){
+                                              users = Array.from(users)
+                                              if(users.length > 0){
                                                 msg += "-------------------\n"
                                                 r({
                                                     msg: msg,
                                                     users: Array.from(users),
                                                     hasUpdate: true
                                                 })  
-                                            }
-                                        });
-                                    });             
-                                }
+
+                                              }
+                                          }
+                                      });
+                                  });
                               }
                             });  
                         });              
                     }); 
-                    console.log("跑完了")
+                    // console.log("跑完了 newlist: ", newList)
                 }).then(res => {
                     resolve(res)
                 })
@@ -221,10 +224,10 @@ function updateBangumi(connection){
             let newList = []
             console.log("subscribes: ", subscribes)
             subscribes.forEach((sub, index) => {
-                console.log("out loop ", index)
+                // console.log("out loop ", index)
                 let LastIndex = subscribes[index].lastIndex
                 sub.source.forEach((item, index2) => {
-                    console.log("inner loop ", index)
+                    // console.log("inner loop ", index)
                     //判断该资源是否已被收录
                     let sql = `SELECT id from resources where link = '${item.link}'`
                     connection.query(sql, function (error, results, fields) {
@@ -257,8 +260,8 @@ function updateBangumi(connection){
                             });
                         }
                         
-                        console.log("inner loop2 ", index)
-                        console.log(index , subscribes.length - 1, index2, sub.source.length -1)
+                        // console.log("inner loop2 ", index)
+                        // console.log(index , subscribes.length - 1, index2, sub.source.length -1)
                         if((index == subscribes.length - 1) && (index2 == sub.source.length -1)){
                             console.log("newList ", newList)           
                             //     //组织文本
@@ -328,7 +331,7 @@ function getUpdateInfo(connection, qq){
                 // console.log("subscribes ", user.subscribes)
                 //subscribes长这样 |1||3| 先根据||分割字符串，得到 ['|1', '3|']，然后去除 | 字符，转为数字
                 let subscribesArr = String(user.subscribes).split("||").map(function(item){
-                    return item.replace("|", "")
+                    return item.replaceAll("|", "")
                 }).map(function(item){
                     return parseInt(item)
                 })
@@ -379,28 +382,49 @@ function querySubscribeList(connection, qq){
         new Promise(function(resove, reject){        
             connection.query(`SELECT * from user where qq = ${qq}`, function (error, user, fields) {
                 if (error) throw error;
-                user = user[0]
-                //subscribes长这样 |1||3| 先根据||分割字符串，得到 ['|1', '3|']，然后去除 | 字符，转为数字
-                let subscribesArr = String(user.subscribes).split("||").map(function(item){
-                    return item.replace("|", "")
-                }).map(function(item){
-                    return parseInt(item)
-                })
-                console.log("Arr: ", subscribesArr)
-                //先查出来该用户订阅了哪些番剧
-                let queryBangumiSql = `SELECT id, title from bangumi where id in (${subscribesArr})`    
-                connection.query(queryBangumiSql, function (error, bangumis, fields) {
-                    if (error) throw error;
-                    console.log("bangumis: ", bangumis)
-                    resove(bangumis)
-                });
+                if(user.length == 0) {
+                    let sql = `insert into user(qq, subscribes) values(?,'')`;
+                    let params = [qq]
+                    connection.query(sql,params,(err,user)=>{
+                        if (err) {
+                            console.error("新增失败" + err.message);
+                            resove("奇怪，你的初始化失败了");
+                        }else{
+                            resove("还没有订阅任何番剧捏");
+                        }
+                    });
+                }else{
+                    user = user[0]
+                    if(user.subscribes.length == 0){
+                        resove("还没有订阅任何番剧捏");                        
+                    }else{
+                        //subscribes长这样 |1||3| 先根据||分割字符串，得到 ['|1', '3|']，然后去除 | 字符，转为数字
+                        let subscribesArr = String(user.subscribes).split("||").map(function(item){
+                            return item.replaceAll("|", "")
+                        }).map(function(item){
+                            return parseInt(item)
+                        })
+                        console.log("Arr: ", subscribesArr)
+                        //先查出来该用户订阅了哪些番剧
+                        let queryBangumiSql = `SELECT id, title from bangumi where id in (${subscribesArr})`    
+                        connection.query(queryBangumiSql, function (error, bangumis, fields) {
+                            if (error) throw error;
+                            console.log("bangumis: ", bangumis)
+                            resove(bangumis)
+                        });
+                    }                    
+                }
             });
         }).then(function(results) {
-            let msg = "【订阅小助手】当前订阅番剧：\n"
-            results.forEach((item, index) => {
-                msg += `${item.id}. ${String(item.title).split(",")[0]}\n`
-            });
-            resoveOK(msg)
+            if(typeof(results) == 'string'){
+                resoveOK(results)
+            }else{
+                let msg = "【订阅小助手】当前订阅番剧：\n"
+                results.forEach((item, index) => {
+                    msg += `${item.id}. ${String(item.title).split(",")[0]}\n`
+                });
+                resoveOK(msg)
+            }
         })
     })
 }
@@ -426,7 +450,7 @@ function bungumiManage(msg, sender, connection){
                 break;
             }
             case "add":{
-                if(sender.id != '986472954') return "只有管理员才可以操作番剧，注意你的身份！"
+                // if(sender.id != '986472954') return "只有管理员才可以操作番剧，注意你的身份！"
                 if(req.length < 4) resove("缺少参数")
                 let nameArr = String(req[3]).split("|")
                 nameArr.forEach((name, index) => {                    
@@ -444,7 +468,7 @@ function bungumiManage(msg, sender, connection){
                 break;
             }
             case "del":{
-                if(sender.id != '986472954') return "只有管理员才可以操作番剧，注意你的身份！"
+                // if(sender.id != '986472954') return "只有管理员才可以操作番剧，注意你的身份！"
                 if(req.length < 4) resove("缺少参数")
                 let ids = String(req[3]).split("|")
                 let sql = `delete from bangumi where id in (${ids.toString()})`;
@@ -492,8 +516,17 @@ function DealSubscribe(msg, sender, connection){
                 }else{
                     //查询到了该用户
                     let user = users[0]
-                    let hasSet = new Set(String(user.subscribes).split("||").map(item => item.replace("|", "")))
-                    // let hasSet = String(user.subscribes).split("||").map(item => item.replace("|", ""))
+                    let hasSet;
+                    if(user.subscribes.length == 0){
+                        //空
+                        hasSet = new Set();
+                    }else if(user.subscribes.length > 0 && user.subscribes.indexOf("||") < 0){
+                        //只有一条
+                        hasSet = new Set([String(user.subscribes).replaceAll("|", "")])
+                    }else {
+                        hasSet = new Set(String(user.subscribes).split("||").map(item => item.replaceAll("|", "")))
+                    }
+                    // hasSet = new Set(String(user.subscribes).split("||").map(item => item.replace("|", "")))
                     let reqArr = String(msgArr[2]).split(",")
                     reqArr.forEach(id => {
                         msgArr[1] == "add" ? hasSet.add(id): hasSet.delete(id)

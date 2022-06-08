@@ -36,6 +36,12 @@ bot.onMessage(async message => {
     //------------------------------------------
     //-----------------番剧订阅 Start------------
     // bgm <command> [params]
+    // bgm list :  查询可订阅番剧列表
+    // bgm mylist: 我的订阅列表
+    // bgm add|del <番剧ID,番剧ID>: 增删我的订阅
+    // bgm new: 我当前订阅番剧的最新资源
+    // bgm manage add|del <番剧名称> 
+
     // 主动更新番剧资源： bgm update
     // 订阅通知开关选项： bgm notice on/off
     // 查询最新订阅更新： bgm new
@@ -44,10 +50,38 @@ bot.onMessage(async message => {
     // 进行番剧列表管理： bgm manage <queryAll|add|del> [poarams]
     // 新增删除订约番剧： bgm add|del 番剧id
     //------------------------------------------
+
+    //主动查询番剧更新情况
+    if (msg.includes('bgm help') || msg.includes('bgm -h')){    
+      let msg = `指令格式：bgm <command> [params]
+      查询当前可订阅番剧：bgm list
+      查询自己的订阅列表：bgm mylist
+      查询自己最新订阅：bgm new
+      新增我的订阅：bgm add 番剧ID,番剧ID
+      删除我的订阅：bgm del 番剧ID,番剧ID
+      新增番剧列表：bgm manage add 番剧名称,番剧别名
+      删除番剧列表：bgm manage del 番剧ID,番剧ID`
+      bot.quoteReply([Plain(msg)], message); 
+    }
+
+        
     //主动查询番剧更新情况
     if (msg.includes('bgm update')){    
       console.log("开始查询番剧更新情况")
-      DealBangumiUpdate(true, sender.group.id, bot);
+      // DealBangumiUpdate(true, sender.group.id, bot);
+      
+      bangumi.autoUpdate(con).then(function(res){
+        console.log("res1 ", res)
+        if(res.hasUpdate){
+          let actions = [
+            Plain(res.msg)
+          ]
+          res.users.forEach(qq => {
+            actions.push(At(qq))
+          });
+          bot.sendGroupMessage(actions, sender.group.id)
+        }
+      })
     }
 
 
@@ -57,11 +91,8 @@ bot.onMessage(async message => {
         //检查是否已开启
         if(NoticeGroup.filter(function(item){
           return item.groupId == sender.group.id
-        }).length == 0) {          
-          let interval = setInterval( function(){ 
-            
-            console.log("setInterval")
-            //  bangumi.updateBangumi
+        }).length == 0) {
+          let interval = setInterval( function(){
             bangumi.autoUpdate(con).then(function(res){
               if(res.hasUpdate){
                 let actions = [
@@ -70,12 +101,7 @@ bot.onMessage(async message => {
                 res.users.forEach(qq => {
                   actions.push(At(qq))
                 });
-                console.log("发生更新，进行通知 actions", actions)
-                console.log("发生更新，进行通知 sender.group.id", sender.group.id)
-                bot.sendGroupMessage("Hello", sender.group.id)
-                bot.sendGroupMessage(actions, sender.group.id).then(res => {
-                  console.log("res2 ", res)
-                })
+                bot.sendGroupMessage(actions, sender.group.id)
               }
             })
           
@@ -123,6 +149,12 @@ bot.onMessage(async message => {
 
     if(msg.includes('bgm manage')){
       bangumi.bungumiManage(msg, sender, con).then( msg => {
+        bot.quoteReply([Plain(msg)], message);
+      })  
+    }
+
+    if(msg.includes('bgm list')){
+      bangumi.bungumiManage("bgm manage queryAll", sender, con).then( msg => {
         bot.quoteReply([Plain(msg)], message);
       })  
     }
@@ -179,7 +211,7 @@ function InitDataBase(){
   var con = mysql.createConnection({
       host     : 'localhost',
       user     : 'root',
-      password : '123456',
+      password : '139755',
       database : 'bangumi'
     });     
   con.connect();
