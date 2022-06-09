@@ -14,6 +14,11 @@ var bot = InitMiraiBot();
 //初始化接口服务
 httpServer.InitHttpServer(con);
 
+process.on('uncaughtException', (e) => {
+  console.log('有人点了份炒饭！');
+  bot.sendGroupMessage("说了我们店里不卖炒饭！", 828937993)
+  console.log(e);
+});
 //注册事件
 bot.onMessage(async message => {
   const { type, sender, messageChain, reply, quoteReply } = message;

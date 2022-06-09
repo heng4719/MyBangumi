@@ -379,7 +379,7 @@ function getUpdateInfo(connection, qq){
 
 function querySubscribeList(connection, qq){
     return new Promise(function(resoveOK, reject){
-        new Promise(function(resove, reject){        
+        new Promise(function(resove, reject){
             connection.query(`SELECT * from user where qq = ${qq}`, function (error, user, fields) {
                 if (error) throw error;
                 if(user.length == 0) {
@@ -489,6 +489,13 @@ function bungumiManage(msg, sender, connection){
 function DealSubscribe(msg, sender, connection){
     return new Promise( (resove, reject) => {
         let msgArr = msg.split(" ")
+        //参数校验
+        // let check = checkParams("DealSubscribe", msg)
+        // console.log("check: ", check)
+        // if(!check.pass){
+        //     resove(check.msg)
+        //     return
+        // }
         //判断该用户是否存在于user
         new Promise((r,j) => {
             let sql = `select * from user where qq = ${sender.id}`;
@@ -551,5 +558,43 @@ function DealSubscribe(msg, sender, connection){
     })
 }
 
-
+function checkParams(funcName, msg){
+    switch(funcName){
+        //bgm add|del 1,2,4
+        case "DealSubscribe": {
+            let commands = String(msg).split(" ")
+            //长度校验
+            if(commands.length != 3){
+                return {
+                    pass: false,
+                    msg: "不好意思我们店里不卖炒饭"
+                }
+            }
+            let paramString = commands[2]
+            let params = paramString.split(",")
+            let flag = false
+            params.forEach(element => {
+                console.log("isNumber(Number(element)): ", isNumber(Number(element)))
+                if(!isNumber(Number(element))){
+                    flag = true
+                }
+            });
+            if(flag){
+                return {
+                    pass: false,
+                    msg: "不好意思我们店里不卖炒饭"
+                }
+            }else{
+                return {
+                    pass: true,
+                    msg: ""
+                }
+            }
+            
+        }
+    }
+}
+function isNumber(num) {
+	return typeof num === 'number' && !isNaN(num)
+}
 module.exports = {updateBangumi, getUpdateInfo, querySubscribeList, bungumiManage, DealSubscribe, autoUpdate}
