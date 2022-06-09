@@ -490,12 +490,12 @@ function DealSubscribe(msg, sender, connection){
     return new Promise( (resove, reject) => {
         let msgArr = msg.split(" ")
         //参数校验
-        // let check = checkParams("DealSubscribe", msg)
-        // console.log("check: ", check)
-        // if(!check.pass){
-        //     resove(check.msg)
-        //     return
-        // }
+        let check = checkParams("DealSubscribe", msg)
+        console.log("check: ", check)
+        if(!check.pass){
+            resove(check.msg)
+            return
+        }
         //判断该用户是否存在于user
         new Promise((r,j) => {
             let sql = `select * from user where qq = ${sender.id}`;
@@ -575,7 +575,7 @@ function checkParams(funcName, msg){
             let flag = false
             params.forEach(element => {
                 console.log("isNumber(Number(element)): ", isNumber(Number(element)))
-                if(!isNumber(Number(element))){
+                if(!isNumber(Number(element)) || element.indexOf("e") >= 0){
                     flag = true
                 }
             });
