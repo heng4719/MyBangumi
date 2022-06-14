@@ -117,7 +117,7 @@ function autoUpdate(connection){
                                       })  
                                   }
                                   let users = new Set();
-                                  newList.forEach((item, index) => {                                  
+                                  newList.forEach((item, index) => {
                                       //查出有哪些用户订阅了该番剧 
                                       let sql = `select qq from user where subscribes like '%|${item.bangumiId}|%'`
                                       connection.query(sql, null, (error, results, fields) => {
