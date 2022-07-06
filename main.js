@@ -1,5 +1,6 @@
 var bangumi = require('./js/updateBangumi')
 var httpServer = require('./js/httpServer')
+var mark = require('./js/mark')
 var mysql = require('mysql');
 
 const Mirai = require('node-mirai-sdk');
@@ -21,14 +22,19 @@ process.on('uncaughtException', (e) => {
 });
 //注册事件
 bot.onMessage(async message => {
+  console.log("message: ", message)
   const { type, sender, messageChain, reply, quoteReply } = message;
   let msg = '';
+  let img = ''
   messageChain.forEach(chain => {
     if (chain.type === 'Plain')
         msg += Plain.value(chain);       // 从 messageChain 中提取文字内容
+    if (chain.type === 'Image')
+        img = chain.url;       // 从 messageChain 中提取文字内容
   });
-  console.log("msg: ", msg)
-  console.log("sender: ", sender)
+  // console.log("msg: ", msg)
+  // console.log("img: ", img)
+  // console.log("sender: ", sender)
 
   
     //测试主动群聊
@@ -47,28 +53,27 @@ bot.onMessage(async message => {
     // bgm new: 我当前订阅番剧的最新资源
     // bgm manage add|del <番剧名称> 
 
-    // 主动更新番剧资源： bgm update
-    // 订阅通知开关选项： bgm notice on/off
-    // 查询最新订阅更新： bgm new
-    // 进入订阅管理网页： bgm manageWeb
-    // 查询自己订阅列表： bgm mylist
-    // 进行番剧列表管理： bgm manage <queryAll|add|del> [poarams]
-    // 新增删除订约番剧： bgm add|del 番剧id
+    // 主动更新番剧资源: bgm update
+    // 订阅通知开关选项: bgm notice on/off
+    // 查询最新订阅更新: bgm new
+    // 进入订阅管理网页: bgm manageWeb
+    // 查询自己订阅列表: bgm mylist
+    // 进行番剧列表管理: bgm manage <queryAll|add|del> [poarams]
+    // 新增删除订约番剧: bgm add|del 番剧id
     //------------------------------------------
 
     //主动查询番剧更新情况
     if (msg.includes('bgm help') || msg.includes('bgm -h')){    
-      let msg = `指令格式：bgm <command> [params]
-      查询当前可订阅番剧：bgm list
-      查询自己的订阅列表：bgm mylist
-      查询自己最新订阅：bgm new
-      新增我的订阅：bgm add 番剧ID,番剧ID
-      删除我的订阅：bgm del 番剧ID,番剧ID
-      新增番剧列表：bgm manage add 番剧名称,番剧别名
-      删除番剧列表：bgm manage del 番剧ID,番剧ID`
+      let msg = `指令格式:bgm <command> [params]
+      查询当前可订阅番剧:bgm list
+      查询自己的订阅列表:bgm mylist
+      查询自己最新订阅:bgm new
+      新增我的订阅:bgm add 番剧ID,番剧ID
+      删除我的订阅:bgm del 番剧ID,番剧ID
+      新增番剧列表:bgm manage add 番剧名称,番剧别名
+      删除番剧列表:bgm manage del 番剧ID,番剧ID`
       bot.quoteReply([Plain(msg)], message); 
     }
-
         
     //主动查询番剧更新情况
     if (msg.includes('bgm update')){    
@@ -88,7 +93,6 @@ bot.onMessage(async message => {
         }
       })
     }
-
 
     //开启订阅通知
     if (msg.includes('bgm notice')){
@@ -132,7 +136,6 @@ bot.onMessage(async message => {
       }
     }
 
-
     //查询该用户订阅的所有新番的最新一集
     if(msg.includes('bgm new')){
       bangumi.getUpdateInfo(con, sender.id).then(function(result){
@@ -170,15 +173,16 @@ bot.onMessage(async message => {
       })
     }
   }
+
+  //添加新mark
+  if(msg.includes('#mark ')){
+    mark.insert(con, sender.id, msg, img).then(function(result){
+      bot.quoteReply([Plain(result)], message);
+    });    
+  }
   //------------------------------------------
   //-----------------番剧订阅 End--------------
   //------------------------------------------
-
-
-  // if(msg.includes('LDS') || msg.includes('lds')){        
-  //   reply('LDS功能正在绝赞开发中');
-  // }
-
 
   if(msg.includes('setu')){        
     reply('别急，你先别急');
