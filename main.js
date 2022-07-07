@@ -220,7 +220,7 @@ function InitDataBase(){
   var con = mysql.createConnection({
       host     : 'localhost',
       user     : 'root',
-      password : '123456',
+      password : '139755',
       database : 'bangumi'
     });     
   con.connect();
